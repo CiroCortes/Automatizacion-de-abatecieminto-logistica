@@ -52,10 +52,9 @@ def cargar_datos():
 
 
 def obtener_stock_por_bodega(stock):
-    """Stock de bodegas principales por (Codigo, Bodega)."""
-    stk_princ = stock[stock["Cod.Bodega"].isin(BODEGAS_PRINCIPALES)].copy()
-    stk_princ = stk_princ[stk_princ["Stock"].fillna(0) > 0]
-    return stk_princ.groupby(["Codigo", "Cod.Bodega"])["Stock"].sum().reset_index()
+    """Stock siempre disponible por (Codigo, Bodega), cualquier bodega."""
+    stk = stock[stock["Stock"].fillna(0) > 0].copy()
+    return stk.groupby(["Codigo", "Cod.Bodega"])["Stock"].sum().reset_index()
 
 
 def asignar_desde_bodegas(pendiente, stock_por_bodega, lookup_detalle, lookup_producto):
@@ -94,15 +93,26 @@ def asignar_desde_bodegas(pendiente, stock_por_bodega, lookup_detalle, lookup_pr
         sucursal_destino = SUCURSAL_POR_ALMACEN.get(alm_destino, alm_destino)
         destino = f"{bodega_destino} {sucursal_destino}"  # ej: 2 CALAMA, 002-02 ANTOFAGASTA
 
-        # Descontar stock en tránsito
+        # 1) Usar siempre stock de la bodega destino si existe
+        stock_destino = stock_por_bodega[
+            (stock_por_bodega["Codigo"] == codigo) & (stock_por_bodega["Cod.Bodega"] == alm_destino)
+        ]["Stock"].sum()
+
         pendiente_efectivo = pend
-        if alm_destino in TRANSITO_POR_DESTINO:
+        if stock_destino >= pendiente_efectivo:
+            # todo se cubre en destino, no toma de Santiago
+            continue
+
+        pendiente_efectivo = max(0, pendiente_efectivo - stock_destino)
+
+        # 2) Descontar stock en tránsito si aplica
+        if alm_destino in TRANSITO_POR_DESTINO and pendiente_efectivo > 0:
             transito = TRANSITO_POR_DESTINO[alm_destino]
             stk_trans = stock_por_bodega[
                 (stock_por_bodega["Codigo"] == codigo) & (stock_por_bodega["Cod.Bodega"] == transito)
             ]
             if not stk_trans.empty:
-                pendiente_efectivo = max(0, pend - stk_trans["Stock"].sum())
+                pendiente_efectivo = max(0, pendiente_efectivo - stk_trans["Stock"].sum())
 
         if pendiente_efectivo <= 0:
             continue
