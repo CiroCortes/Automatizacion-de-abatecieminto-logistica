@@ -1,0 +1,23 @@
+# Archivos Excel (datos e input/output)
+*.xlsx
+*.xls
+
+# Documentación interna y análisis
+PLANIFICACION.md
+analisis_*.py
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
